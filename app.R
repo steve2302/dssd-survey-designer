@@ -18,6 +18,9 @@ library(ggplot2)
 # zip is only called as zip::zipr(); this never-run line makes sure
 # Shinylive bundles it into the WebAssembly build.
 if (FALSE) library(zip)
+# sf and dssd use tibble only as an optional ("Suggests") package, which
+# Shinylive does not bundle automatically; this line makes sure it is included.
+if (FALSE) library(tibble)
 
 options(shiny.maxRequestSize = 100 * 1024^2)
 
@@ -72,7 +75,7 @@ read_upload <- function(files, layer = NULL) {
          "). Upload one region at a time.", call. = FALSE)
   layers <- sf::st_layers(cand)$name
   lyr <- if (!is.null(layer) && layer %in% layers) layer else layers[1]
-  list(sf = sf::st_zm(sf::read_sf(cand, layer = lyr)), path = cand,
+  list(sf = sf::st_zm(sf::st_read(cand, layer = lyr, quiet = TRUE)), path = cand,
        layers = layers, layer = lyr)
 }
 
@@ -271,7 +274,7 @@ server <- function(input, output, session) {
   raw <- reactive({
     if (input$region_src == "example") {
       p <- system.file("extdata", paste0(input$example, ".shp"), package = "dssd")
-      list(sf = sf::read_sf(p), path = p, layers = NULL, layer = NULL)
+      list(sf = sf::st_read(p, quiet = TRUE), path = p, layers = NULL, layer = NULL)
     } else {
       req(input$region_file)
       safely(read_upload(input$region_file, input$layer), "Reading file")
@@ -611,10 +614,10 @@ server <- function(input, output, session) {
     dep <- function(x) paste(deparse(x, width.cutoff = 500L), collapse = "")
     src <- res$src
     read_line <- if (input$region_src == "example") {
-      sprintf('shape <- sf::read_sf(system.file("extdata", "%s.shp", package = "dssd"))',
+      sprintf('shape <- sf::st_read(system.file("extdata", "%s.shp", package = "dssd"), quiet = TRUE)',
               input$example)
     } else {
-      sprintf('shape <- sf::read_sf("%s"%s)  # edit path',
+      sprintf('shape <- sf::st_read("%s"%s, quiet = TRUE)  # edit path',
               basename(src$path),
               if (!is.null(src$layer) && length(src$layers) > 1)
                 sprintf(', layer = "%s"', src$layer) else "")
